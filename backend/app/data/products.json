@@ -1,0 +1,11 @@
+[
+  { "id": "p-sheets-basic", "name": "Basic Twin XL Sheet Set", "category": "bedding", "price": 24.99, "ship_days": 3 },
+  { "id": "p-sheets-premium", "name": "Premium Cotton Twin XL Sheets", "category": "bedding", "price": 49.99, "ship_days": 5 },
+  { "id": "p-comforter", "name": "Reversible Comforter", "category": "bedding", "price": 39.99, "ship_days": 4 },
+  { "id": "p-towels", "name": "6-Piece Towel Set", "category": "bath", "price": 22.99, "ship_days": 2 },
+  { "id": "p-caddy", "name": "Mesh Shower Caddy", "category": "bath", "price": 12.99, "ship_days": 2 },
+  { "id": "p-hamper", "name": "Collapsible Laundry Hamper", "category": "laundry", "price": 15.99, "ship_days": 3 },
+  { "id": "p-powerstrip", "name": "6-Outlet Surge Protector", "category": "electronics", "price": 18.99, "ship_days": 2 },
+  { "id": "p-bins", "name": "Set of 3 Under-Bed Bins", "category": "storage", "price": 29.99, "ship_days": 6 },
+  { "id": "p-fridge", "name": "3.2 cu ft Mini Fridge", "category": "kitchen", "price": 129.99, "ship_days": 9 }
+]

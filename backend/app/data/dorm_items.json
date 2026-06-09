@@ -1,0 +1,13 @@
+[
+  { "id": "twin-xl-sheets", "name": "Twin XL Sheet Set", "category": "bedding", "essential": true },
+  { "id": "comforter", "name": "Comforter", "category": "bedding", "essential": true },
+  { "id": "mattress-pad", "name": "Mattress Pad", "category": "bedding", "essential": false },
+  { "id": "towels", "name": "Bath Towels", "category": "bath", "essential": true },
+  { "id": "shower-caddy", "name": "Shower Caddy", "category": "bath", "essential": true },
+  { "id": "laundry-hamper", "name": "Laundry Hamper", "category": "laundry", "essential": true },
+  { "id": "detergent", "name": "Laundry Detergent", "category": "laundry", "essential": true },
+  { "id": "power-strip", "name": "Surge-Protected Power Strip", "category": "electronics", "essential": true },
+  { "id": "desk-lamp", "name": "Desk Lamp", "category": "desk", "essential": false },
+  { "id": "storage-bins", "name": "Under-Bed Storage Bins", "category": "storage", "essential": false },
+  { "id": "mini-fridge", "name": "Mini Fridge", "category": "kitchen", "essential": false }
+]

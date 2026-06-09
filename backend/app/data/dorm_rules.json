@@ -1,0 +1,7 @@
+[
+  { "id": "no-candles", "rule": "Open-flame items (candles, incense) are prohibited", "prohibits": ["candles", "incense"] },
+  { "id": "no-hotplate", "rule": "Hot plates and open-coil cooking appliances are prohibited", "prohibits": ["hot-plate"] },
+  { "id": "fridge-size", "rule": "Mini fridges must be 4.0 cu ft or smaller", "constraint": { "item": "mini-fridge", "max_cubic_feet": 4.0 } },
+  { "id": "no-halogen", "rule": "Halogen lamps are prohibited", "prohibits": ["halogen-lamp"] },
+  { "id": "command-strips-only", "rule": "Wall mounting must use removable adhesive (no nails/screws)", "prohibits": ["nails", "screws"] }
+]

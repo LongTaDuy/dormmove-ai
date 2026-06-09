@@ -1,0 +1,10 @@
+[
+  { "id": "bedding", "name": "Bedding", "priority": "essential" },
+  { "id": "bath", "name": "Bath & Toiletries", "priority": "essential" },
+  { "id": "storage", "name": "Storage & Organization", "priority": "recommended" },
+  { "id": "laundry", "name": "Laundry", "priority": "essential" },
+  { "id": "electronics", "name": "Electronics", "priority": "recommended" },
+  { "id": "kitchen", "name": "Mini Kitchen", "priority": "optional" },
+  { "id": "desk", "name": "Desk & Study", "priority": "recommended" },
+  { "id": "decor", "name": "Decor", "priority": "optional" }
+]
