@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { EmptyState } from "@/components/EmptyState";
+import { ConnectionError } from "@/components/ConnectionError";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
+import { PlanEmptyState } from "@/components/PlanEmptyState";
 import { RiskFlagCard } from "@/components/RiskFlagCard";
 import { ScoreCard } from "@/components/ScoreCard";
-import { ApiError, getPlan } from "@/lib/api";
+import { getPlan } from "@/lib/api";
+import { usePlanResource } from "@/hooks/usePlanResource";
 import { scorePercent, verdictColor } from "@/lib/format";
-import type { MoveInPlan } from "@/types";
 
 const SCORE_HELPERS: Record<string, string> = {
   Readiness: "Profile completeness and essential item coverage.",
@@ -23,22 +23,8 @@ const SCORE_HELPERS: Record<string, string> = {
 
 export default function ResultsPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [plan, setPlan] = useState<MoveInPlan | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!sessionId) return;
-    setLoading(true);
-    getPlan(sessionId)
-      .then(setPlan)
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 404) setNotFound(true);
-        else setError(e instanceof Error ? e.message : "Failed to load plan");
-      })
-      .finally(() => setLoading(false));
-  }, [sessionId]);
+  const { data: plan, status, errorMessage, isOffline, retry } =
+    usePlanResource(sessionId, getPlan);
 
   const scores = plan
     ? [
@@ -60,16 +46,17 @@ export default function ResultsPage() {
     <AppShell sessionId={sessionId}>
       <h1 className="page-title mb-6">Move-in results</h1>
 
-      {loading && <LoadingState message="Loading plan…" />}
-      {error && <ErrorState message={error} />}
-      {notFound && (
-        <EmptyState
-          title="No plan yet"
-          message="Chat with the planner first to generate your move-in plan."
-        />
+      {status === "loading" && <LoadingState message="Loading plan…" />}
+      {status === "no-session" && <PlanEmptyState kind="no-session" />}
+      {status === "no-plan" && <PlanEmptyState kind="no-plan" />}
+      {status === "error" && isOffline && (
+        <ConnectionError message={errorMessage ?? ""} onRetry={retry} />
+      )}
+      {status === "error" && !isOffline && (
+        <ErrorState message={errorMessage ?? ""} onRetry={retry} />
       )}
 
-      {plan && (
+      {status === "ready" && plan && (
         <div className="space-y-6">
           <div className="card border-brand/25 bg-gradient-to-br from-brand-light to-ivory p-8 text-center">
             <p className="section-title">Final move-in score</p>

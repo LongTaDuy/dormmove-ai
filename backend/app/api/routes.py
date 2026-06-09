@@ -28,7 +28,7 @@ from app.models.schemas import (
     TimelineEnvelopeResponse,
     TimelineSummary,
 )
-from app.orchestrator.graph import orchestrator
+from app.orchestrator.graph import Orchestrator, orchestrator
 
 router = APIRouter(prefix="/api/v1")
 
@@ -39,6 +39,11 @@ _NO_PLAN = "No plan has been generated for this session yet."
 def get_session_service(request: Request) -> SessionService:
     """Resolve the per-app SessionService set up during startup."""
     return request.app.state.session_service
+
+
+def get_orchestrator(request: Request) -> Orchestrator:
+    """Resolve the orchestrator wired during app startup."""
+    return getattr(request.app.state, "orchestrator", orchestrator)
 
 
 def _require_session(service: SessionService, session_id: str) -> None:
@@ -221,29 +226,31 @@ def get_runtime_metrics(
 
 @router.post("/chat", response_model=ChatResponse, tags=["chat"])
 def chat(
-    request: ChatRequest,
+    body: ChatRequest,
+    request: Request,
     service: SessionService = Depends(get_session_service),
+    orch: Orchestrator = Depends(get_orchestrator),
 ) -> ChatResponse:
-    _require_session(service, request.session_id)
+    _require_session(service, body.session_id)
 
-    service.append_message(request.session_id, role="user", content=request.message)
+    service.append_message(body.session_id, role="user", content=body.message)
 
-    previous_profile = service.get_profile(request.session_id)
-    state = orchestrator.run_turn(
-        session_id=request.session_id,
-        message=request.message,
+    previous_profile = service.get_profile(body.session_id)
+    state = orch.run_turn(
+        session_id=body.session_id,
+        message=body.message,
         profile=previous_profile,
     )
 
-    service.save_profile(request.session_id, state.profile)
+    service.save_profile(body.session_id, state.profile)
 
     if state.plan is not None:
         service.save_plan_snapshot(
-            request.session_id, state.plan, state.plan.score_breakdown
+            body.session_id, state.plan, state.plan.score_breakdown
         )
 
     service.append_message(
-        request.session_id,
+        body.session_id,
         role="assistant",
         content=state.reply,
         meta={
@@ -255,7 +262,7 @@ def chat(
     )
 
     return ChatResponse(
-        session_id=request.session_id,
+        session_id=body.session_id,
         reply=state.reply,
         profile=state.profile,
         plan=state.plan,

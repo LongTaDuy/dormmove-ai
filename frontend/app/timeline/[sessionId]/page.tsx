@@ -1,33 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
-import { EmptyState } from "@/components/EmptyState";
+import { ConnectionError } from "@/components/ConnectionError";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
+import { PlanEmptyState } from "@/components/PlanEmptyState";
 import { TimelineList } from "@/components/TimelineList";
-import { ApiError, getTimeline } from "@/lib/api";
+import { getTimeline } from "@/lib/api";
+import { usePlanResource } from "@/hooks/usePlanResource";
 import { categoryLabel } from "@/lib/format";
-import type { TimelineEnvelopeResponse } from "@/types";
 
 export default function TimelinePage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [data, setData] = useState<TimelineEnvelopeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!sessionId) return;
-    getTimeline(sessionId)
-      .then(setData)
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 404) setNotFound(true);
-        else setError(e instanceof Error ? e.message : "Failed to load");
-      })
-      .finally(() => setLoading(false));
-  }, [sessionId]);
+  const { data, status, errorMessage, isOffline, retry } = usePlanResource(
+    sessionId,
+    getTimeline,
+  );
 
   const s = data?.summary;
 
@@ -35,16 +24,17 @@ export default function TimelinePage() {
     <AppShell sessionId={sessionId}>
       <h1 className="page-title mb-6">Move-in timeline</h1>
 
-      {loading && <LoadingState />}
-      {error && <ErrorState message={error} />}
-      {notFound && (
-        <EmptyState
-          title="No timeline yet"
-          message="Generate a plan in the planner first."
-        />
+      {status === "loading" && <LoadingState />}
+      {status === "no-session" && <PlanEmptyState kind="no-session" />}
+      {status === "no-plan" && <PlanEmptyState kind="no-plan" />}
+      {status === "error" && isOffline && (
+        <ConnectionError message={errorMessage ?? ""} onRetry={retry} />
+      )}
+      {status === "error" && !isOffline && (
+        <ErrorState message={errorMessage ?? ""} onRetry={retry} />
       )}
 
-      {data && s && (
+      {status === "ready" && data && s && (
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-3">
             <StatCard label="Tasks" value={String(s.total_tasks)} />

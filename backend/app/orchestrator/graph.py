@@ -19,6 +19,8 @@ from app.agents import (
     ProfilePlannerAgent,
     RulesAuditAgent,
 )
+from app.core.config import Settings, get_settings
+from app.core.model_router import ModelRouter
 from app.models.schemas import StudentMoveInProfile
 from app.orchestrator.state import AgentState
 
@@ -37,9 +39,17 @@ PLANNING_ROUTES = {
 class Orchestrator:
     """Coordinates the rule-based agent pipeline for one chat turn."""
 
-    def __init__(self) -> None:
-        self.concierge = ConciergeAgent()
-        self.profile_planner = ProfilePlannerAgent()
+    def __init__(
+        self,
+        settings: Settings | None = None,
+        model_router: ModelRouter | None = None,
+    ) -> None:
+        settings = settings or get_settings()
+        router = model_router or ModelRouter(settings)
+        self.concierge = ConciergeAgent(model_router=router, settings=settings)
+        self.profile_planner = ProfilePlannerAgent(
+            model_router=router, settings=settings
+        )
         self.checklist_agent = ChecklistAgent()
         self.rules_audit = RulesAuditAgent()
         self.budget_agent = BudgetAgent()
@@ -120,5 +130,13 @@ class Orchestrator:
         )
 
 
+def create_orchestrator(
+    settings: Settings | None = None,
+    model_router: ModelRouter | None = None,
+) -> Orchestrator:
+    """Build an orchestrator wired to settings and optional ModelRouter."""
+    return Orchestrator(settings=settings, model_router=model_router)
+
+
 # Module-level singleton; agents are stateless so this is safe to reuse.
-orchestrator = Orchestrator()
+orchestrator = create_orchestrator()

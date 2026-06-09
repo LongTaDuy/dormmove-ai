@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { HealthBadge } from "@/components/HealthBadge";
+import { RuntimeMetricsCard } from "@/components/RuntimeMetricsCard";
 import { DEMO_PROMPT } from "@/lib/constants";
 
 const VALUE_PROPS = [
@@ -58,11 +59,19 @@ export default function HomePage() {
               <Link href="/planner" className="btn-primary px-8 py-3 text-base">
                 Start planning
               </Link>
-              <Link href="/planner" className="btn-secondary px-8 py-3 text-base">
+              <Link
+                href="/planner?runDemo=1"
+                className="btn-secondary px-8 py-3 text-base"
+                aria-label="Open planner and run demo prompt"
+              >
                 View demo flow
               </Link>
             </div>
           </div>
+        </section>
+
+        <section className="mt-12">
+          <RuntimeMetricsCard />
         </section>
 
         <section className="mt-12 grid gap-5 sm:grid-cols-3">
@@ -93,7 +102,11 @@ export default function HomePage() {
           <blockquote className="mt-4 rounded-xl border border-border bg-cream/60 px-4 py-4 text-sm leading-relaxed text-espresso/90">
             {DEMO_PROMPT}
           </blockquote>
-          <Link href="/planner" className="btn-accent mt-5">
+          <Link
+            href="/planner?runDemo=1"
+            className="btn-accent mt-5"
+            aria-label="Open planner with demo prompt"
+          >
             Open planner with demo
           </Link>
         </section>

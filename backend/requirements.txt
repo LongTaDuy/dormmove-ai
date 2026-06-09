@@ -14,10 +14,12 @@ python-dotenv==1.2.2
 pytest==9.0.3
 httpx==0.28.1
 
+# Optional LLM provider (only used when DORMMOVE_MODEL_PROVIDER=openai)
+openai>=1.0.0
+
 # ---- Optional extensions (uncomment when needed) ----
 # redis==5.2.1
 # langgraph==0.2.60
 # langchain-core==0.3.28
-# openai==1.59.6
 # google-generativeai==0.8.3
 # boto3==1.35.92

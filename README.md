@@ -100,6 +100,55 @@ database so they survive restarts. The database location is controlled by the
 `backend/local_data/dormmove.sqlite3` (created automatically on first run).
 The `local_data/` folder and `*.sqlite3` / `*.db` files are gitignored.
 
+### Model router (mock vs OpenAI)
+
+LLM support is **optional** and **off by default**. Mock mode runs the same
+deterministic parsers and agents with no API key.
+
+**Mock mode (default):**
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+$env:DORMMOVE_MODEL_PROVIDER="mock"
+uvicorn app.main:app --reload --port 8000
+```
+
+**OpenAI mode** (profile extraction + intent classification only):
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+$env:OPENAI_API_KEY="your-key-here"
+$env:DORMMOVE_MODEL_PROVIDER="openai"
+$env:DORMMOVE_LLM_MODEL="gpt-4o-mini"
+uvicorn app.main:app --reload --port 8000
+```
+
+What the LLM does:
+
+- **Profile extraction** — supplements the deterministic parser when fields are
+  hard to parse (e.g. `28th aug 2026`, compact follow-up messages).
+- **Intent classification** — optional high-confidence routing in ConciergeAgent.
+
+What stays **deterministic** (never LLM-controlled):
+
+- Checklist generation
+- Dorm rules audit
+- Budget allocation
+- Product recommendations
+- Move-in timeline
+- MoveInScoringEngine / final verdict
+
+**Fallback behavior:** If OpenAI times out or errors and
+`DORMMOVE_ALLOW_LLM_FALLBACK=true` (default), ModelRouter returns mock-style
+deterministic output with `fallback_used=true` so the app keeps working.
+Session caps (`DORMMOVE_MAX_MODEL_CALLS_PER_SESSION`,
+`DORMMOVE_MAX_ESTIMATED_COST_PER_SESSION_USD`) block further model calls per
+session when exceeded.
+
+Never commit `.env` or API keys. Use `.env.example` placeholders only.
+
 ### API routes
 
 | Method | Route | Purpose |
@@ -125,7 +174,7 @@ backend and frontend apps. See the roadmap below for next steps.
 - [x] Project structure + minimal runnable backend/frontend
 - [x] Pydantic domain models (student profile, plan, risks)
 - [x] Seed data (dorm items, dorm rules, products, categories)
-- [ ] ModelRouter with mock model
+- [x] ModelRouter with mock model (+ optional OpenAI)
 - [x] Rule-based agents + orchestrator
 - [x] Scoring engine
 - [x] Persistent sessions (SQLite) + optional Redis checkpointing

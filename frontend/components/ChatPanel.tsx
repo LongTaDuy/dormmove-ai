@@ -40,10 +40,16 @@ export function ChatPanel({
         <p className="mt-2 text-sm leading-relaxed text-muted">{HELPER_TEXT}</p>
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto bg-ivory p-5">
+      <div
+        className="flex-1 space-y-4 overflow-y-auto bg-ivory p-5"
+        role="log"
+        aria-live="polite"
+        aria-label="Chat messages"
+      >
         {messages.length === 0 && (
           <p className="rounded-xl border border-dashed border-border bg-cream/30 px-4 py-8 text-center text-sm text-muted">
-            Send a message or use the demo prompt below to generate your plan.
+            No messages yet — send your move-in details or use the demo prompt
+            below to generate your plan.
           </p>
         )}
         {messages.map((msg, i) => (
@@ -52,6 +58,8 @@ export function ChatPanel({
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
+              role="article"
+              aria-label={msg.role === "user" ? "Your message" : "Assistant reply"}
               className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 msg.role === "user"
                   ? "bg-brand text-white shadow-soft"
@@ -79,6 +87,7 @@ export function ChatPanel({
           placeholder="Example: double dorm at Denison, move-in Aug 24, $650 budget…"
           rows={3}
           disabled={loading || disabled}
+          aria-label="Move-in planning message"
           className="w-full resize-none rounded-xl border border-border bg-ivory px-4 py-3 text-base text-espresso placeholder:text-muted/70 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
@@ -87,19 +96,22 @@ export function ChatPanel({
             }
           }}
         />
+        <p className="text-xs text-muted">Enter to send · Shift+Enter for a new line</p>
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="submit"
             disabled={loading || disabled || !input.trim()}
             className="btn-primary min-w-[100px]"
+            aria-label="Send message"
           >
-            Send
+            {loading ? "Sending…" : "Send"}
           </button>
           <button
             type="button"
             onClick={() => setInput(DEMO_PROMPT)}
             disabled={loading || disabled}
             className="btn-accent"
+            aria-label="Insert demo move-in prompt"
           >
             Use demo prompt
           </button>

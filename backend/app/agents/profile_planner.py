@@ -10,9 +10,14 @@ import re
 from datetime import date
 
 from app.agents.base import BaseAgent
+from app.core.async_utils import run_sync_async
+from app.core.config import Settings, get_settings
+from app.core.llm_schemas import LLMProfileUpdate
+from app.core.model_router import ModelRouter
 from app.models.schemas import (
     BudgetPreference,
     RoomType,
+    StudentMoveInProfile,
     TransportationMode,
 )
 from app.orchestrator.state import AgentState
@@ -49,11 +54,57 @@ _ARTICLES = ("a ", "an ", "the ", "some ", "my ")
 class ProfilePlannerAgent(BaseAgent):
     name = "ProfilePlannerAgent"
 
+    def __init__(
+        self,
+        model_router: ModelRouter | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self._model_router = model_router
+        self._settings = settings or get_settings()
+
     def run(self, state: AgentState) -> AgentState:
         profile = state.profile
         message = state.message
-        updated: list[str] = []
+        updated = self.apply_deterministic_parsers(profile, message)
 
+        llm_note = ""
+        if self._model_router and self._settings.model_provider != "mock":
+            try:
+                llm_update = run_sync_async(
+                    self._model_router.extract_profile_update(
+                        message=message,
+                        previous_profile=profile,
+                        session_id=state.session_id,
+                    )
+                )
+                merged = merge_llm_profile_update(profile, llm_update)
+                updated = list(dict.fromkeys(updated + merged))
+                if merged:
+                    llm_note = (
+                        f" LLM merge ({llm_update.confidence:.2f}): "
+                        f"{', '.join(merged)}."
+                    )
+            except Exception as exc:  # noqa: BLE001 — continue with baseline
+                llm_note = f" LLM extraction skipped: {exc}."
+
+        state.missing_fields = profile.missing_required_fields()
+
+        summary = (
+            f"Updated fields: {', '.join(updated)}."
+            if updated
+            else "No new profile fields extracted."
+        )
+        summary += llm_note
+        if state.missing_fields:
+            summary += f" Still missing: {', '.join(state.missing_fields)}."
+        state.add_trace(self.name, "updated_profile", summary)
+        return state
+
+    def apply_deterministic_parsers(
+        self, profile: StudentMoveInProfile, message: str
+    ) -> list[str]:
+        """Run regex/keyword parsers and return names of fields that changed."""
+        updated: list[str] = []
         self._parse_school(message, profile, updated)
         self._parse_dorm(message, profile, updated)
         self._parse_room_type(message, profile, updated)
@@ -65,18 +116,7 @@ class ProfilePlannerAgent(BaseAgent):
         self._parse_transportation(message, profile, updated)
         self._parse_restrictions(message, profile, updated)
         self._parse_preferences(message, profile, updated)
-
-        state.missing_fields = profile.missing_required_fields()
-
-        summary = (
-            f"Updated fields: {', '.join(updated)}."
-            if updated
-            else "No new profile fields extracted."
-        )
-        if state.missing_fields:
-            summary += f" Still missing: {', '.join(state.missing_fields)}."
-        state.add_trace(self.name, "updated_profile", summary)
-        return state
+        return updated
 
     # -- individual field parsers ------------------------------------------
 
@@ -126,6 +166,12 @@ class ProfilePlannerAgent(BaseAgent):
 
     def _parse_budget(self, msg: str, profile, updated: list[str]) -> None:
         if profile.budget_total is not None:
+            return
+        stripped = msg.strip()
+        # Short follow-up like "$500" or "500".
+        if re.fullmatch(r"\$?\s?(\d{2,5}(?:\.\d{1,2})?)", stripped):
+            profile.budget_total = float(re.sub(r"[^\d.]", "", stripped))
+            updated.append("budget_total")
             return
         # "$650" or "650 dollars" or "budget is 650" / "budget of 650".
         m = re.search(r"\$\s?(\d{2,5}(?:\.\d{1,2})?)", msg)
@@ -228,6 +274,21 @@ class ProfilePlannerAgent(BaseAgent):
 
     def _extract_date(self, msg: str) -> date | None:
         today = date.today()
+
+        # Day-first form: "28th aug 2026", "28 aug" (check before month-first).
+        m = re.search(
+            r"\b(\d{1,2})(?:st|nd|rd|th)?\s+"
+            r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*"
+            r"(?:\.?\s*(\d{4}))?",
+            msg,
+            re.IGNORECASE,
+        )
+        if m:
+            day = int(m.group(1))
+            month = _MONTHS[m.group(2).lower()[:3]]
+            year = int(m.group(3)) if m.group(3) else None
+            return self._build_date(year, month, day, today)
+
         # Month-name form: "August 24", "Aug 24th, 2026".
         m = re.search(
             r"\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+"
@@ -292,3 +353,64 @@ class ProfilePlannerAgent(BaseAgent):
                 existing.add(item.lower())
                 added.append(item)
         return added
+
+
+def merge_llm_profile_update(
+    profile: StudentMoveInProfile,
+    update: LLMProfileUpdate,
+    min_confidence: float = 0.5,
+) -> list[str]:
+    """Merge high-confidence LLM fields; never overwrite non-null with null."""
+    if update.confidence < min_confidence:
+        return []
+
+    changed: list[str] = []
+
+    if update.school_name and not profile.school_name:
+        profile.school_name = update.school_name
+        changed.append("school_name")
+    if update.dorm_name and not profile.dorm_name:
+        profile.dorm_name = update.dorm_name
+        changed.append("dorm_name")
+    if update.room_type is not None and profile.room_type is RoomType.unknown:
+        profile.room_type = update.room_type
+        changed.append("room_type")
+    if update.move_in_date is not None and profile.move_in_date is None:
+        profile.move_in_date = update.move_in_date
+        changed.append("move_in_date")
+    if update.budget_total is not None and profile.budget_total is None:
+        profile.budget_total = update.budget_total
+        changed.append("budget_total")
+    if (
+        update.budget_preference is not None
+        and profile.budget_preference is BudgetPreference.balanced
+        and update.budget_preference is not BudgetPreference.balanced
+    ):
+        profile.budget_preference = update.budget_preference
+        changed.append("budget_preference")
+    if update.climate_or_location_notes and not profile.climate_or_location_notes:
+        profile.climate_or_location_notes = update.climate_or_location_notes
+        changed.append("climate_or_location_notes")
+    if (
+        update.transportation_mode is not None
+        and profile.transportation_mode is TransportationMode.unknown
+    ):
+        profile.transportation_mode = update.transportation_mode
+        changed.append("transportation_mode")
+
+    for field_name in (
+        "already_owned_items",
+        "roommate_items",
+        "dietary_or_health_needs",
+        "restrictions",
+        "preferences",
+    ):
+        new_items = getattr(update, field_name)
+        if new_items:
+            added = ProfilePlannerAgent._extend_unique(
+                getattr(profile, field_name), new_items
+            )
+            if added:
+                changed.append(field_name)
+
+    return changed

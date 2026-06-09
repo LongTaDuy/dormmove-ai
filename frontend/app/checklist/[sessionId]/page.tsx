@@ -1,33 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { ChecklistTable } from "@/components/ChecklistTable";
-import { EmptyState } from "@/components/EmptyState";
+import { ConnectionError } from "@/components/ConnectionError";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
-import { ApiError, getChecklist } from "@/lib/api";
+import { PlanEmptyState } from "@/components/PlanEmptyState";
+import { getChecklist } from "@/lib/api";
+import { usePlanResource } from "@/hooks/usePlanResource";
 import { formatCurrency } from "@/lib/format";
-import type { ChecklistEnvelopeResponse } from "@/types";
 
 export default function ChecklistPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const [data, setData] = useState<ChecklistEnvelopeResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [notFound, setNotFound] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!sessionId) return;
-    getChecklist(sessionId)
-      .then(setData)
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 404) setNotFound(true);
-        else setError(e instanceof Error ? e.message : "Failed to load");
-      })
-      .finally(() => setLoading(false));
-  }, [sessionId]);
+  const { data, status, errorMessage, isOffline, retry } = usePlanResource(
+    sessionId,
+    getChecklist,
+  );
 
   const s = data?.summary;
 
@@ -35,7 +24,7 @@ export default function ChecklistPage() {
     <AppShell sessionId={sessionId}>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <h1 className="page-title">Dorm checklist</h1>
-        {s && (
+        {s && status === "ready" && (
           <div className="rounded-xl border border-brand/30 bg-brand-light px-4 py-2">
             <p className="text-xs font-medium text-brand">Est. remaining cost</p>
             <p className="text-xl font-bold text-brand-dark">
@@ -45,16 +34,17 @@ export default function ChecklistPage() {
         )}
       </div>
 
-      {loading && <LoadingState />}
-      {error && <ErrorState message={error} />}
-      {notFound && (
-        <EmptyState
-          title="No checklist yet"
-          message="Generate a plan in the planner first."
-        />
+      {status === "loading" && <LoadingState />}
+      {status === "no-session" && <PlanEmptyState kind="no-session" />}
+      {status === "no-plan" && <PlanEmptyState kind="no-plan" />}
+      {status === "error" && isOffline && (
+        <ConnectionError message={errorMessage ?? ""} onRetry={retry} />
+      )}
+      {status === "error" && !isOffline && (
+        <ErrorState message={errorMessage ?? ""} onRetry={retry} />
       )}
 
-      {data && s && (
+      {status === "ready" && data && s && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <StatCard label="Total" value={String(s.total)} />

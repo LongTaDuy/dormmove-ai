@@ -54,6 +54,9 @@ export function Header({ sessionId: sessionIdProp }: { sessionId?: string | null
               return (
                 <span
                   key={segment}
+                  role="link"
+                  aria-disabled="true"
+                  aria-label={`${label} — start planning to unlock`}
                   title="Start planning to unlock this view"
                   className="cursor-not-allowed rounded-lg px-3 py-2 text-sm text-muted/50"
                 >
@@ -83,6 +86,8 @@ function NavLink({
   return (
     <Link
       href={href}
+      aria-current={active ? "page" : undefined}
+      aria-label={label}
       className={`rounded-lg px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-brand/30 ${
         active
           ? "bg-brand-light text-brand"

@@ -14,6 +14,9 @@ import type {
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
+const SESSION_NOT_FOUND = "Session not found.";
+const NO_PLAN = "No plan has been generated for this session yet.";
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -23,6 +26,38 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+export function getApiErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return error.detail ?? error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Something went wrong. Please try again.";
+}
+
+export function isNetworkError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 0;
+}
+
+export function isSessionNotFound(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 404 &&
+    (error.detail === SESSION_NOT_FOUND ||
+      error.message.includes("Session not found"))
+  );
+}
+
+export function isNoPlanError(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    error.status === 404 &&
+    (error.detail === NO_PLAN ||
+      error.message.includes("No plan has been generated"))
+  );
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -43,7 +78,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let detail = res.statusText;
     try {
       const body = await res.json();
-      detail = body.detail ?? detail;
+      if (typeof body.detail === "string") {
+        detail = body.detail;
+      }
     } catch {
       // ignore parse errors
     }

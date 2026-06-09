@@ -10,7 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import __version__
 from app.api.routes import router as api_router
 from app.core.config import get_settings
+from app.core.model_router import ModelRouter
 from app.memory import SessionService
+from app.orchestrator.graph import create_orchestrator
 
 
 def create_app() -> FastAPI:
@@ -36,6 +38,12 @@ def create_app() -> FastAPI:
     session_service = SessionService(settings.sqlite_path)
     session_service.initialize()
     app.state.session_service = session_service
+
+    model_router = ModelRouter(settings)
+    app.state.model_router = model_router
+    app.state.orchestrator = create_orchestrator(
+        settings=settings, model_router=model_router
+    )
 
     app.add_middleware(
         CORSMiddleware,
