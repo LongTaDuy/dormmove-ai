@@ -89,13 +89,20 @@ database so they survive restarts. The database location is controlled by the
 `backend/local_data/dormmove.sqlite3` (created automatically on first run).
 The `local_data/` folder and `*.sqlite3` / `*.db` files are gitignored.
 
-Session API:
+### API routes
 
-- `POST /api/v1/sessions` — create a session
-- `GET /api/v1/sessions` — list sessions (newest first)
-- `GET /api/v1/sessions/{id}` — full session snapshot (profile, messages, latest plan/score)
-- `GET /api/v1/sessions/{id}/plan` — latest plan (404 if none yet)
-- `POST /api/v1/chat` — chat within an existing session (404 if the session is unknown)
+| Method | Route | Purpose |
+|--------|-------|---------|
+| `GET` | `/health` | Health check |
+| `POST` | `/api/v1/sessions` | Create a session (optional `title` in body) |
+| `GET` | `/api/v1/sessions` | List sessions with score, verdict, message count |
+| `GET` | `/api/v1/sessions/{id}` | Full session snapshot (profile, messages, plan) |
+| `GET` | `/api/v1/sessions/{id}/plan` | Latest move-in plan |
+| `GET` | `/api/v1/sessions/{id}/checklist` | Checklist with status summary |
+| `GET` | `/api/v1/sessions/{id}/products` | Product recommendations by category |
+| `GET` | `/api/v1/sessions/{id}/timeline` | Move-in timeline with phase summary |
+| `GET` | `/api/v1/metrics/runtime` | Aggregate runtime metrics from SQLite |
+| `POST` | `/api/v1/chat` | Chat within a session; persists profile and plan |
 
 ## Status
 
@@ -105,11 +112,12 @@ backend and frontend apps. See the roadmap below for next steps.
 ## Roadmap
 
 - [x] Project structure + minimal runnable backend/frontend
-- [ ] Pydantic domain models (student profile, plan, risks)
-- [ ] Seed data (dorm items, dorm rules, products, categories)
+- [x] Pydantic domain models (student profile, plan, risks)
+- [x] Seed data (dorm items, dorm rules, products, categories)
 - [ ] ModelRouter with mock model
-- [ ] Rule-based agents + orchestrator
-- [ ] Scoring engine
-- [ ] Persistent sessions (SQLite) + optional Redis checkpointing
+- [x] Rule-based agents + orchestrator
+- [x] Scoring engine
+- [x] Persistent sessions (SQLite) + optional Redis checkpointing
+- [x] Frontend-ready API routes (checklist, products, timeline, metrics)
 - [ ] Frontend intake form + plan view
 - [ ] LangGraph integration behind the orchestrator interface

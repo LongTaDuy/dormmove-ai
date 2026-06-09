@@ -7,7 +7,7 @@ business logic beyond validation and a few derived helpers.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field, model_validator
@@ -207,6 +207,10 @@ class MoveInPlan(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class CreateSessionRequest(BaseModel):
+    title: str | None = None
+
+
 class CreateSessionResponse(BaseModel):
     session_id: str
 
@@ -231,11 +235,15 @@ class SessionSummary(BaseModel):
     title: str = "DormMove Plan"
     created_at: str | None = None
     updated_at: str | None = None
+    latest_score: float | None = None
+    latest_verdict: str | None = None
+    message_count: int = 0
+    has_plan: bool = False
+    # Legacy / convenience fields kept for existing consumers.
     school_name: str | None = None
     dorm_name: str | None = None
     move_in_date: date | None = None
     verdict: Verdict = Verdict.NEEDS_WORK
-    message_count: int = 0
 
 
 class SessionSnapshotResponse(BaseModel):
@@ -247,3 +255,60 @@ class SessionSnapshotResponse(BaseModel):
     messages: list[dict] = Field(default_factory=list)
     latest_plan: MoveInPlan | None = None
     latest_score: ScoreBreakdown | None = None
+
+
+class ChecklistSummary(BaseModel):
+    total: int = 0
+    needed: int = 0
+    already_owned: int = 0
+    roommate_has: int = 0
+    check_rules: int = 0
+    estimated_remaining_cost: float = 0.0
+
+
+class ChecklistEnvelopeResponse(BaseModel):
+    session_id: str
+    checklist: list[ChecklistItem] = Field(default_factory=list)
+    summary: ChecklistSummary = Field(default_factory=ChecklistSummary)
+
+
+class ProductRecommendationsSummary(BaseModel):
+    total_products: int = 0
+    category_count: int = 0
+    avg_price: float = 0.0
+    avg_rating: float = 0.0
+
+
+class ProductRecommendationsEnvelopeResponse(BaseModel):
+    session_id: str
+    categories: dict[str, list[ProductCandidate]] = Field(default_factory=dict)
+    summary: ProductRecommendationsSummary = Field(
+        default_factory=ProductRecommendationsSummary
+    )
+
+
+class TimelineSummary(BaseModel):
+    total_tasks: int = 0
+    phases: list[str] = Field(default_factory=list)
+    risk_flag_count: int = 0
+
+
+class TimelineEnvelopeResponse(BaseModel):
+    session_id: str
+    timeline: list[TimelineTask] = Field(default_factory=list)
+    summary: TimelineSummary = Field(default_factory=TimelineSummary)
+
+
+class RiskFlagCount(BaseModel):
+    flag: str
+    count: int
+
+
+class RuntimeMetricsResponse(BaseModel):
+    session_count: int = 0
+    message_count: int = 0
+    plan_snapshot_count: int = 0
+    average_final_move_in_score: float | None = None
+    verdict_counts: dict[str, int] = Field(default_factory=dict)
+    most_common_risk_flags: list[RiskFlagCount] = Field(default_factory=list)
+    generated_at: datetime

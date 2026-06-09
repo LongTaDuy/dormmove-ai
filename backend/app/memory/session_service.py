@@ -15,6 +15,8 @@ from app.memory.sqlite_store import SqliteStore
 from app.models.schemas import (
     CreateSessionResponse,
     MoveInPlan,
+    RiskFlagCount,
+    RuntimeMetricsResponse,
     ScoreBreakdown,
     SessionSnapshotResponse,
     SessionSummary,
@@ -79,7 +81,9 @@ class SessionService:
         summaries: list[SessionSummary] = []
         for row in rows:
             profile = self._profile_from_json(row["profile_json"])
-            verdict = self._verdict_from_json(row["latest_score_json"])
+            score = self._score_from_json(row["latest_score_json"])
+            verdict = score.verdict if score else Verdict.NEEDS_WORK
+            has_plan = bool(row["latest_plan_json"])
             count_row = self.store.query_one(
                 "SELECT COUNT(*) AS c FROM messages WHERE session_id = ?",
                 (row["session_id"],),
@@ -91,11 +95,14 @@ class SessionService:
                     title=row["title"],
                     created_at=row["created_at"],
                     updated_at=row["updated_at"],
+                    latest_score=score.final_move_in_score if score else None,
+                    latest_verdict=verdict.value if score else None,
+                    message_count=message_count,
+                    has_plan=has_plan,
                     school_name=profile.school_name,
                     dorm_name=profile.dorm_name,
                     move_in_date=profile.move_in_date,
                     verdict=verdict,
-                    message_count=message_count,
                 )
             )
         return summaries
@@ -209,6 +216,49 @@ class SessionService:
         if row is None:
             return None
         return self._plan_from_json(row["latest_plan_json"])
+
+    def get_runtime_metrics(self) -> RuntimeMetricsResponse:
+        session_row = self.store.query_one("SELECT COUNT(*) AS c FROM sessions")
+        message_row = self.store.query_one("SELECT COUNT(*) AS c FROM messages")
+        snapshot_row = self.store.query_one(
+            "SELECT COUNT(*) AS c FROM plan_snapshots"
+        )
+
+        score_rows = self.store.query_all(
+            "SELECT latest_score_json FROM sessions WHERE latest_score_json IS NOT NULL"
+        )
+        scores: list[float] = []
+        verdict_counts: dict[str, int] = {}
+        risk_flag_counts: dict[str, int] = {}
+
+        for row in score_rows:
+            score = self._score_from_json(row["latest_score_json"])
+            if score is None:
+                continue
+            scores.append(score.final_move_in_score)
+            verdict_key = score.verdict.value
+            verdict_counts[verdict_key] = verdict_counts.get(verdict_key, 0) + 1
+            for flag in score.risk_flags:
+                risk_flag_counts[flag] = risk_flag_counts.get(flag, 0) + 1
+
+        most_common = sorted(
+            risk_flag_counts.items(), key=lambda pair: (-pair[1], pair[0])
+        )[:10]
+
+        avg_score = round(sum(scores) / len(scores), 3) if scores else None
+
+        return RuntimeMetricsResponse(
+            session_count=session_row["c"] if session_row else 0,
+            message_count=message_row["c"] if message_row else 0,
+            plan_snapshot_count=snapshot_row["c"] if snapshot_row else 0,
+            average_final_move_in_score=avg_score,
+            verdict_counts=verdict_counts,
+            most_common_risk_flags=[
+                RiskFlagCount(flag=flag, count=count)
+                for flag, count in most_common
+            ],
+            generated_at=datetime.now(timezone.utc),
+        )
 
     # -- helpers -----------------------------------------------------------
 
