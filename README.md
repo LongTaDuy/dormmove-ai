@@ -70,6 +70,17 @@ Open http://localhost:3000.
 The frontend reads the backend URL from `NEXT_PUBLIC_API_BASE_URL`
 (defaults to `http://localhost:8000`).
 
+Frontend pages:
+
+| Route | Purpose |
+|-------|---------|
+| `/` | Landing page with value props and CTA |
+| `/planner` | Chat-based move-in planner (creates/persists session) |
+| `/results/[sessionId]` | Score breakdown and verdict |
+| `/checklist/[sessionId]` | Filterable checklist by category |
+| `/products/[sessionId]` | Product recommendations by category |
+| `/timeline/[sessionId]` | Move-in timeline grouped by phase |
+
 ### 3. Docker (optional)
 
 ```bash
@@ -119,5 +130,5 @@ backend and frontend apps. See the roadmap below for next steps.
 - [x] Scoring engine
 - [x] Persistent sessions (SQLite) + optional Redis checkpointing
 - [x] Frontend-ready API routes (checklist, products, timeline, metrics)
-- [ ] Frontend intake form + plan view
+- [x] Frontend planner + plan views (checklist, products, timeline, results)
 - [ ] LangGraph integration behind the orchestrator interface

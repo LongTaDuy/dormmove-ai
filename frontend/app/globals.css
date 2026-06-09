@@ -3,11 +3,58 @@
 @tailwind utilities;
 
 :root {
-  --background: #0b1020;
-  --foreground: #e6e8f0;
+  --background: #faf4e8;
+  --foreground: #2f2a24;
+  --card: #fffdf7;
+  --border: #e7d8c9;
+  --brand: #c86b3c;
+  --brand-dark: #a8552f;
+  --muted: #7a7065;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-border bg-ivory shadow-card;
+  }
+
+  .card-muted {
+    @apply rounded-2xl border border-border bg-cream/60;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-soft transition hover:bg-brand-dark focus:outline-none focus:ring-2 focus:ring-brand/40 focus:ring-offset-2 focus:ring-offset-cream disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-xl border border-border bg-ivory px-5 py-2.5 text-sm font-semibold text-espresso shadow-soft transition hover:border-border-dark hover:bg-cream focus:outline-none focus:ring-2 focus:ring-brand/30 focus:ring-offset-2 focus:ring-offset-cream disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-muted transition hover:border-border-dark hover:bg-cream hover:text-espresso focus:outline-none focus:ring-2 focus:ring-brand/20;
+  }
+
+  .btn-accent {
+    @apply inline-flex items-center justify-center rounded-xl border border-brand/30 bg-brand-light px-4 py-2 text-sm font-semibold text-brand transition hover:border-brand/50 hover:bg-brand/10 focus:outline-none focus:ring-2 focus:ring-brand/30 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold tracking-tight text-espresso sm:text-3xl;
+  }
+
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-wide text-muted;
+  }
+
+  .stat-card {
+    @apply rounded-xl border border-border bg-ivory p-4 text-center shadow-soft;
+  }
 }
