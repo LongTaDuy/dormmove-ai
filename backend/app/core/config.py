@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +31,13 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "sqlite:///./dormmove.db"
+
+    # SQLite session memory. Relative paths are resolved against the backend
+    # working directory. Override with the DORMMOVE_SQLITE_PATH env var.
+    sqlite_path: str = Field(
+        default="local_data/dormmove.sqlite3",
+        validation_alias="DORMMOVE_SQLITE_PATH",
+    )
 
     # Optional Redis checkpointing (LangGraph)
     redis_url: str = ""

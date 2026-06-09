@@ -1,45 +1,32 @@
 """API routes for DormMove AI.
 
-Exposes a versioned router with the chat endpoint that drives the rule-based
-agent orchestrator.
-
-NOTE (temporary): session state is kept in a process-local in-memory dict.
-This is intentionally simple for this milestone and will be replaced by the
-SQLite-backed session store (and optional Redis checkpointing) in a later step.
-Do not rely on this for multi-process or persistent deployments.
+Exposes a versioned router with session management and the chat endpoint that
+drives the rule-based agent orchestrator. Session state is persisted via the
+SQLite-backed :class:`SessionService` (resolved from ``app.state``).
 """
 
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass, field
-
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app import __version__
+from app.memory import SessionService
 from app.models.schemas import (
     ChatRequest,
     ChatResponse,
     CreateSessionResponse,
     MoveInPlan,
-    StudentMoveInProfile,
+    SessionSnapshotResponse,
+    SessionSummary,
 )
 from app.orchestrator.graph import orchestrator
 
 router = APIRouter(prefix="/api/v1")
 
 
-@dataclass
-class _SessionState:
-    """TODO: replace with persistent SQLite-backed session storage."""
-
-    profile: StudentMoveInProfile = field(default_factory=StudentMoveInProfile)
-    plan: MoveInPlan | None = None
-    message_count: int = 0
-
-
-# TODO: temporary in-memory session store (not persistent, not multi-process safe).
-_SESSIONS: dict[str, _SessionState] = {}
+def get_session_service(request: Request) -> SessionService:
+    """Resolve the per-app SessionService set up during startup."""
+    return request.app.state.session_service
 
 
 @router.get("/ping", tags=["meta"])
@@ -47,32 +34,102 @@ def ping() -> dict[str, str]:
     return {"message": "pong", "version": __version__}
 
 
-@router.post("/session", response_model=CreateSessionResponse, tags=["session"])
-def create_session() -> CreateSessionResponse:
-    session_id = uuid.uuid4().hex
-    _SESSIONS[session_id] = _SessionState()
-    return CreateSessionResponse(session_id=session_id)
+@router.post("/sessions", response_model=CreateSessionResponse, tags=["session"])
+def create_session(
+    service: SessionService = Depends(get_session_service),
+) -> CreateSessionResponse:
+    return service.create_session()
+
+
+@router.get("/sessions", response_model=list[SessionSummary], tags=["session"])
+def list_sessions(
+    service: SessionService = Depends(get_session_service),
+) -> list[SessionSummary]:
+    return service.list_sessions()
+
+
+@router.get(
+    "/sessions/{session_id}",
+    response_model=SessionSnapshotResponse,
+    tags=["session"],
+)
+def get_session(
+    session_id: str,
+    service: SessionService = Depends(get_session_service),
+) -> SessionSnapshotResponse:
+    if not service.session_exists(session_id):
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+    return service.get_session_snapshot(session_id)
+
+
+@router.get(
+    "/sessions/{session_id}/plan",
+    response_model=MoveInPlan,
+    tags=["session"],
+)
+def get_session_plan(
+    session_id: str,
+    service: SessionService = Depends(get_session_service),
+) -> MoveInPlan:
+    if not service.session_exists(session_id):
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+    plan = service.get_latest_plan(session_id)
+    if plan is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No plan yet for session '{session_id}'. Send a chat message first.",
+        )
+    return plan
 
 
 @router.post("/chat", response_model=ChatResponse, tags=["chat"])
-def chat(request: ChatRequest) -> ChatResponse:
-    # 1. Load previous session state (create lazily if unknown).
-    session = _SESSIONS.setdefault(request.session_id, _SessionState())
+def chat(
+    request: ChatRequest,
+    service: SessionService = Depends(get_session_service),
+) -> ChatResponse:
+    if not service.session_exists(request.session_id):
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Session '{request.session_id}' not found. "
+                "Create one with POST /api/v1/sessions first."
+            ),
+        )
 
-    # 2. Run the orchestrator with the prior profile.
+    # 1. Record the user's message.
+    service.append_message(request.session_id, role="user", content=request.message)
+
+    # 2. Load the saved profile and run the orchestrator with it.
+    previous_profile = service.get_profile(request.session_id)
     state = orchestrator.run_turn(
         session_id=request.session_id,
         message=request.message,
-        profile=session.profile,
+        profile=previous_profile,
     )
 
-    # 3. Update in-memory session state (TODO: persist instead).
-    session.profile = state.profile
-    if state.plan is not None:
-        session.plan = state.plan
-    session.message_count += 1
+    # 3. Persist the updated profile.
+    service.save_profile(request.session_id, state.profile)
 
-    # 4. Return the structured response.
+    # 4. Persist a plan snapshot when one was produced.
+    if state.plan is not None:
+        service.save_plan_snapshot(
+            request.session_id, state.plan, state.plan.score_breakdown
+        )
+
+    # 5. Record the assistant reply with structured metadata.
+    service.append_message(
+        request.session_id,
+        role="assistant",
+        content=state.reply,
+        meta={
+            "trace": state.trace,
+            "risk_flags": state.risk_flags,
+            "missing_fields": state.missing_fields,
+            "route": state.route,
+        },
+    )
+
+    # 6. Return the structured response.
     return ChatResponse(
         session_id=request.session_id,
         reply=state.reply,

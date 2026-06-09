@@ -17,7 +17,7 @@ situation, and move-in date, then generates a personalized, explainable move-in 
 
 DormMove AI follows a multi-agent AI app pattern:
 
-- **Backend**: FastAPI + Pydantic + SQLite (optional Redis checkpointing)
+- **Backend**: FastAPI + Pydantic + SQLite session memory (optional Redis checkpointing)
 - **Orchestrator**: LangGraph-style agent workflow. A mock/rule-based mode works
   out of the box; LangGraph can be plugged in later without changing the API.
 - **Agents**: focused agents (intake, checklist, budget, recommendations,
@@ -80,6 +80,22 @@ docker compose up --build
 
 Copy `.env.example` to `.env` and adjust values. All variables have sensible
 defaults so the app runs locally without external services or API keys.
+
+### Session persistence (SQLite)
+
+Chat sessions, messages, and plan snapshots are persisted in a local SQLite
+database so they survive restarts. The database location is controlled by the
+`DORMMOVE_SQLITE_PATH` environment variable and defaults to
+`backend/local_data/dormmove.sqlite3` (created automatically on first run).
+The `local_data/` folder and `*.sqlite3` / `*.db` files are gitignored.
+
+Session API:
+
+- `POST /api/v1/sessions` — create a session
+- `GET /api/v1/sessions` — list sessions (newest first)
+- `GET /api/v1/sessions/{id}` — full session snapshot (profile, messages, latest plan/score)
+- `GET /api/v1/sessions/{id}/plan` — latest plan (404 if none yet)
+- `POST /api/v1/chat` — chat within an existing session (404 if the session is unknown)
 
 ## Status
 

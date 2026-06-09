@@ -46,7 +46,7 @@ def test_orchestrator_asks_for_missing_fields_when_incomplete():
 
 def test_chat_endpoint_returns_plan_and_trace():
     # Fresh session via the API.
-    session_id = client.post("/api/v1/session").json()["session_id"]
+    session_id = client.post("/api/v1/sessions").json()["session_id"]
 
     resp = client.post(
         "/api/v1/chat",
@@ -69,7 +69,7 @@ def test_chat_endpoint_returns_plan_and_trace():
 
 
 def test_chat_endpoint_persists_profile_across_turns():
-    session_id = client.post("/api/v1/session").json()["session_id"]
+    session_id = client.post("/api/v1/sessions").json()["session_id"]
 
     client.post(
         "/api/v1/chat",

@@ -9,6 +9,9 @@ env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# ---- Local data / SQLite session memory ----
+local_data/
 *.sqlite3
 *.db
 

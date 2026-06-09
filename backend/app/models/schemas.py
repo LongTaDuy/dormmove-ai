@@ -228,6 +228,9 @@ class ChatResponse(BaseModel):
 
 class SessionSummary(BaseModel):
     session_id: str
+    title: str = "DormMove Plan"
+    created_at: str | None = None
+    updated_at: str | None = None
     school_name: str | None = None
     dorm_name: str | None = None
     move_in_date: date | None = None
@@ -237,6 +240,10 @@ class SessionSummary(BaseModel):
 
 class SessionSnapshotResponse(BaseModel):
     session_id: str
+    title: str = "DormMove Plan"
+    created_at: str = ""
+    updated_at: str = ""
     profile: StudentMoveInProfile
-    plan: MoveInPlan | None = None
-    missing_fields: list[str] = Field(default_factory=list)
+    messages: list[dict] = Field(default_factory=list)
+    latest_plan: MoveInPlan | None = None
+    latest_score: ScoreBreakdown | None = None
