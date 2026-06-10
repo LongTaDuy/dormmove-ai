@@ -2,6 +2,7 @@ import type {
   ChatResponse,
   ChecklistEnvelopeResponse,
   CreateSessionResponse,
+  EvidenceItem,
   HealthResponse,
   MoveInPlan,
   ProductRecommendationsEnvelopeResponse,
@@ -149,4 +150,16 @@ export function getTimeline(
 
 export function getRuntimeMetrics(): Promise<RuntimeMetricsResponse> {
   return request<RuntimeMetricsResponse>("/api/v1/metrics/runtime");
+}
+
+export function searchKnowledge(
+  q: string,
+  topK = 5,
+  tags?: string[],
+): Promise<EvidenceItem[]> {
+  const params = new URLSearchParams({ q, top_k: String(topK) });
+  if (tags?.length) {
+    params.set("tags", tags.join(","));
+  }
+  return request<EvidenceItem[]>(`/api/v1/knowledge/search?${params.toString()}`);
 }

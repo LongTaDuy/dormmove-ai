@@ -8,6 +8,7 @@ import { getStoredSessionId } from "@/lib/session";
 const BASE_NAV = [
   { href: "/", label: "Home", requiresSession: false },
   { href: "/planner", label: "Planner", requiresSession: false },
+  { href: "/knowledge", label: "Evidence Lab", requiresSession: false },
 ];
 
 const SESSION_NAV = [

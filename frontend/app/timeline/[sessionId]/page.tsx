@@ -7,8 +7,11 @@ import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
 import { PlanEmptyState } from "@/components/PlanEmptyState";
 import { TimelineList } from "@/components/TimelineList";
+import { RetrievedEvidenceCard } from "@/components/RetrievedEvidenceCard";
 import { getTimeline } from "@/lib/api";
+import { EVIDENCE_ACTIONS, evidenceFromTrace } from "@/lib/evidence";
 import { usePlanResource } from "@/hooks/usePlanResource";
+import { useSessionTrace } from "@/hooks/useSessionTrace";
 import { categoryLabel } from "@/lib/format";
 
 export default function TimelinePage() {
@@ -17,6 +20,10 @@ export default function TimelinePage() {
     sessionId,
     getTimeline,
   );
+  const { trace } = useSessionTrace(sessionId);
+  const timelineEvidence = evidenceFromTrace(trace, [
+    ...EVIDENCE_ACTIONS.timeline,
+  ]);
 
   const s = data?.summary;
 
@@ -36,6 +43,13 @@ export default function TimelinePage() {
 
       {status === "ready" && data && s && (
         <div className="space-y-6">
+          <RetrievedEvidenceCard
+            evidence={timelineEvidence.slice(0, 4)}
+            title="Logistics evidence"
+            helperText="Local knowledge snippets supporting timeline and shipping guidance."
+            compact
+          />
+
           <div className="grid grid-cols-3 gap-3">
             <StatCard label="Tasks" value={String(s.total_tasks)} />
             <StatCard label="Phases" value={String(s.phases.length)} />

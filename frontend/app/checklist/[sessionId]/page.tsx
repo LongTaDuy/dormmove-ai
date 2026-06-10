@@ -7,8 +7,11 @@ import { ConnectionError } from "@/components/ConnectionError";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
 import { PlanEmptyState } from "@/components/PlanEmptyState";
+import { RetrievedEvidenceCard } from "@/components/RetrievedEvidenceCard";
 import { getChecklist } from "@/lib/api";
+import { EVIDENCE_ACTIONS, evidenceFromTrace } from "@/lib/evidence";
 import { usePlanResource } from "@/hooks/usePlanResource";
+import { useSessionTrace } from "@/hooks/useSessionTrace";
 import { formatCurrency } from "@/lib/format";
 
 export default function ChecklistPage() {
@@ -17,6 +20,10 @@ export default function ChecklistPage() {
     sessionId,
     getChecklist,
   );
+  const { trace } = useSessionTrace(sessionId);
+  const checklistEvidence = evidenceFromTrace(trace, [
+    ...EVIDENCE_ACTIONS.checklist,
+  ]);
 
   const s = data?.summary;
 
@@ -46,6 +53,13 @@ export default function ChecklistPage() {
 
       {status === "ready" && data && s && (
         <div className="space-y-6">
+          <RetrievedEvidenceCard
+            evidence={checklistEvidence.slice(0, 4)}
+            title="Packing & rule evidence"
+            helperText="Grounding snippets for checklist and generic dorm-rule items."
+            compact
+          />
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             <StatCard label="Total" value={String(s.total)} />
             <StatCard label="Needed" value={String(s.needed)} highlight />

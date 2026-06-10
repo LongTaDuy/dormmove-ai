@@ -29,6 +29,23 @@ export function verdictLabel(verdict: Verdict | string): string {
   return verdict.replace(/_/g, " ");
 }
 
+export function riskLevelColor(level: string | undefined): string {
+  switch (level?.toLowerCase()) {
+    case "high":
+      return "text-danger bg-danger-light border-danger-border";
+    case "medium":
+      return "text-warning bg-warning-light border-warning-border";
+    case "low":
+    default:
+      return "text-sage bg-sage/10 border-sage/30";
+  }
+}
+
+export function sourceTypeLabel(sourceType: string | undefined): string {
+  if (!sourceType) return "Knowledge";
+  return sourceType.replace(/_/g, " ");
+}
+
 export function verdictColor(verdict: Verdict | string): string {
   switch (verdict) {
     case "READY":

@@ -9,6 +9,7 @@ import { ConnectionError } from "@/components/ConnectionError";
 import { ErrorState } from "@/components/ErrorState";
 import { LoadingState } from "@/components/LoadingState";
 import { NextStepsCard } from "@/components/NextStepsCard";
+import { RetrievedEvidenceCard } from "@/components/RetrievedEvidenceCard";
 import { ProfileSummary } from "@/components/ProfileSummary";
 import { RiskFlagCard } from "@/components/RiskFlagCard";
 import { ScoreCard } from "@/components/ScoreCard";
@@ -29,6 +30,7 @@ import {
   traceFromSnapshot,
 } from "@/lib/chat";
 import { DEMO_PROMPT } from "@/lib/constants";
+import { topEvidenceFromTrace } from "@/lib/evidence";
 import { missingRequiredFields } from "@/lib/profile";
 import {
   clearStoredSessionId,
@@ -323,6 +325,14 @@ export function PlannerClient() {
           <RiskFlagCard flags={riskFlags} />
 
           {plan && sessionId && <NextStepsCard sessionId={sessionId} />}
+
+          {plan && (
+            <RetrievedEvidenceCard
+              evidence={topEvidenceFromTrace(trace, 5)}
+              helperText="DormMove uses local curated knowledge snippets to ground generic dorm-rule and logistics guidance."
+              compact
+            />
+          )}
 
           {plan && sessionId && (
             <div className="card p-5">

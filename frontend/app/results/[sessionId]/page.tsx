@@ -5,12 +5,15 @@ import { useParams } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { ConnectionError } from "@/components/ConnectionError";
 import { ErrorState } from "@/components/ErrorState";
+import { EvidencePanel } from "@/components/EvidencePanel";
 import { LoadingState } from "@/components/LoadingState";
 import { PlanEmptyState } from "@/components/PlanEmptyState";
 import { RiskFlagCard } from "@/components/RiskFlagCard";
 import { ScoreCard } from "@/components/ScoreCard";
 import { getPlan } from "@/lib/api";
+import { EVIDENCE_ACTIONS, evidenceFromTrace } from "@/lib/evidence";
 import { usePlanResource } from "@/hooks/usePlanResource";
+import { useSessionTrace } from "@/hooks/useSessionTrace";
 import { scorePercent, verdictColor } from "@/lib/format";
 
 const SCORE_HELPERS: Record<string, string> = {
@@ -25,6 +28,15 @@ export default function ResultsPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
   const { data: plan, status, errorMessage, isOffline, retry } =
     usePlanResource(sessionId, getPlan);
+  const {
+    trace,
+    loading: traceLoading,
+    errorMessage: traceError,
+    isOffline: traceOffline,
+    retry: retryTrace,
+  } = useSessionTrace(sessionId);
+
+  const ruleEvidence = evidenceFromTrace(trace, [...EVIDENCE_ACTIONS.rules]);
 
   const scores = plan
     ? [
@@ -79,6 +91,30 @@ export default function ResultsPage() {
                 description={SCORE_HELPERS[label]}
               />
             ))}
+          </div>
+
+          <div className="card p-6">
+            <h3 className="section-title">Why DormMove flagged this</h3>
+            <p className="mt-2 text-xs text-muted">
+              Generic dorm guidance retrieved from local curated knowledge—not
+              your school&apos;s official housing policy.
+            </p>
+            {traceLoading ? (
+              <p className="mt-4 text-sm text-muted">Loading evidence…</p>
+            ) : traceError && traceOffline ? (
+              <div className="mt-4">
+                <ConnectionError message={traceError} onRetry={retryTrace} />
+              </div>
+            ) : ruleEvidence.length > 0 ? (
+              <div className="mt-4">
+                <EvidencePanel evidence={ruleEvidence} title="" compact />
+              </div>
+            ) : (
+              <p className="mt-4 rounded-xl border border-dashed border-border bg-cream/40 px-4 py-6 text-center text-sm text-muted">
+                No retrieved rule evidence for this session yet. Generate a plan
+                in the planner to see grounded warnings.
+              </p>
+            )}
           </div>
 
           {plan.score_breakdown.top_reasons.length > 0 && (

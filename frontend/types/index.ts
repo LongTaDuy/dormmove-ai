@@ -119,11 +119,28 @@ export interface ChatResponse {
   trace: TraceEntry[];
 }
 
+export type EvidenceRiskLevel = "low" | "medium" | "high" | string;
+
+export interface EvidenceItem {
+  doc_id: string;
+  title: string;
+  source_type?: string;
+  risk_level?: EvidenceRiskLevel;
+  score?: number;
+  content?: string;
+  tags?: string[];
+}
+
 export interface TraceEntry {
   agent: string;
   action: string;
   summary: string;
+  timestamp?: string;
+  evidence?: EvidenceItem[];
 }
+
+/** Retrieved knowledge keyed by planning domain (rules, checklist, budget, timeline). */
+export type RetrievedContext = Record<string, EvidenceItem[]>;
 
 export interface SessionSummary {
   session_id: string;
