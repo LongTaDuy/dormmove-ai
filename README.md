@@ -25,8 +25,12 @@ DormMove AI follows a multi-agent AI app pattern:
 - **Scoring engine**: deterministic, explainable scoring for recommendations and
   risk flags.
 - **ModelRouter**: an LLM abstraction. Defaults to a mock model so the app runs
-  without paid API keys; OpenAI / Gemini / Bedrock can be added behind the same
-  interface.
+  without paid API keys; OpenAI can optionally assist profile extraction and
+  intent routing.
+- **Local knowledge retrieval**: a lightweight RAG-style layer over curated dorm
+  move-in documents (keyword scoring, no external vector DB). Retrieved snippets
+  ground generic rule warnings and planning trace evidence. School-specific
+  policies still require the user to confirm official housing rules.
 - **Frontend**: Next.js + TypeScript + TailwindCSS.
 
 ```
@@ -149,6 +153,29 @@ session when exceeded.
 
 Never commit `.env` or API keys. Use `.env.example` placeholders only.
 
+### Local knowledge retrieval (RAG-style)
+
+DormMove AI ships with a curated local knowledge base (`backend/app/rag/`) covering
+generic dorm rules, packing tips, budget advice, roommate coordination, logistics,
+and safety notes. A simple keyword retriever scores documents by title, tag, and
+content overlap—no external vector database or API keys required.
+
+Retrieved documents ground:
+
+- **RulesAuditAgent** — generic prohibition warnings with cited evidence
+- **ChecklistAgent** — packing advice in trace (especially for flight move-ins)
+- **BudgetAgent** — budget tips in notes/trace
+- **TimelineAgent** — logistics evidence in trace
+
+Warnings remain generic unless the user supplies school-specific rules. Confirm
+official housing policy before relying on any appliance or mounting guidance.
+
+Debug retrieval manually:
+
+```bash
+curl "http://localhost:8000/api/v1/knowledge/search?q=candles%20hot%20plate&top_k=5"
+```
+
 ### API routes
 
 | Method | Route | Purpose |
@@ -162,6 +189,7 @@ Never commit `.env` or API keys. Use `.env.example` placeholders only.
 | `GET` | `/api/v1/sessions/{id}/products` | Product recommendations by category |
 | `GET` | `/api/v1/sessions/{id}/timeline` | Move-in timeline with phase summary |
 | `GET` | `/api/v1/metrics/runtime` | Aggregate runtime metrics from SQLite |
+| `GET` | `/api/v1/knowledge/search?q=...` | Debug local knowledge retrieval |
 | `POST` | `/api/v1/chat` | Chat within a session; persists profile and plan |
 
 ## Status

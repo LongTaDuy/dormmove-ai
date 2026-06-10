@@ -43,6 +43,9 @@ class AgentState:
     risk_flags: list[str] = field(default_factory=list)
     rule_notes: list[str] = field(default_factory=list)
 
+    # Local RAG retrieval (keyed by agent domain: rules, checklist, budget, timeline)
+    retrieved_context: dict[str, list[dict]] = field(default_factory=dict)
+
     # Derived numbers
     estimated_cost: float = 0.0
 
@@ -52,9 +55,25 @@ class AgentState:
     reply: str = ""
     trace: list[dict] = field(default_factory=list)
 
-    def add_trace(self, agent: str, action: str, summary: str) -> None:
+    def add_trace(
+        self,
+        agent: str,
+        action: str,
+        summary: str,
+        evidence: list[dict] | None = None,
+    ) -> None:
         """Append a structured trace entry describing what an agent did."""
-        self.trace.append({"agent": agent, "action": action, "summary": summary})
+        entry: dict = {"agent": agent, "action": action, "summary": summary}
+        if evidence:
+            entry["evidence"] = evidence
+        self.trace.append(entry)
+
+    def store_retrieved_context(
+        self, domain: str, documents: list[dict]
+    ) -> None:
+        """Persist retrieved knowledge snippets for a planning domain."""
+        if documents:
+            self.retrieved_context[domain] = documents
 
     def add_risk_flags(self, flags: list[str]) -> None:
         """Add risk flags, de-duplicating while preserving order."""

@@ -2,6 +2,7 @@
 
 Marks already-owned and roommate-provided items, flags rule-risky items for
 review, and estimates each item's price as the midpoint of its min/max range.
+Retrieved packing knowledge adds trace evidence without inventing new items.
 """
 
 from __future__ import annotations
@@ -14,12 +15,17 @@ from app.models.schemas import (
     ChecklistStatus,
     DormItem,
     DormRuleRisk,
+    TransportationMode,
 )
 from app.orchestrator.state import AgentState
+from app.rag.retriever import LocalKnowledgeRetriever, RetrievedDocument, get_retriever
 
 
 class ChecklistAgent(BaseAgent):
     name = "ChecklistAgent"
+
+    def __init__(self, retriever: LocalKnowledgeRetriever | None = None) -> None:
+        self._retriever = retriever or get_retriever()
 
     def run(self, state: AgentState) -> AgentState:
         profile = state.profile
@@ -54,15 +60,46 @@ class ChecklistAgent(BaseAgent):
             )
 
         state.checklist = checklist
-        state.add_trace(
-            self.name,
-            "generated_checklist",
-            (
-                f"Generated {len(checklist)} checklist items with "
-                f"{owned_count + roommate_count} already owned or "
-                f"roommate-provided, and {check_rules_count} needing rule review."
-            ),
+
+        retrieval_query = " ".join(
+            [
+                state.message,
+                profile.room_type.value,
+                profile.transportation_mode.value,
+                " ".join(owned),
+                " ".join(roommate),
+                " ".join(profile.preferences),
+            ]
         )
+        tags = ["packing", "checklist", "essentials"]
+        if profile.transportation_mode is TransportationMode.flight:
+            tags.extend(["flight", "compact", "logistics", "bulky"])
+        retrieved = self._retriever.retrieve(retrieval_query, top_k=5, tags=tags)
+        state.store_retrieved_context("checklist", _docs_to_dicts(retrieved))
+
+        trace_summary = (
+            f"Generated {len(checklist)} checklist items with "
+            f"{owned_count + roommate_count} already owned or "
+            f"roommate-provided, and {check_rules_count} needing rule review."
+        )
+        if retrieved:
+            state.add_trace(
+                self.name,
+                "retrieved_checklist_context",
+                f"Retrieved {len(retrieved)} packing/checklist document(s).",
+                evidence=_evidence_summary(retrieved),
+            )
+            if profile.transportation_mode is TransportationMode.flight:
+                flight_docs = [
+                    d for d in retrieved if "flight" in d.tags or "bulky" in d.tags
+                ]
+                if flight_docs:
+                    titles = ", ".join(doc.title for doc in flight_docs[:2])
+                    trace_summary += (
+                        f" Flight packing evidence: {titles}."
+                    )
+
+        state.add_trace(self.name, "generated_checklist", trace_summary)
         return state
 
     def _classify_item(
@@ -95,3 +132,25 @@ class ChecklistAgent(BaseAgent):
         if status is ChecklistStatus.check_rules:
             return f"{item.reason} Confirm this is allowed before purchasing."
         return item.reason
+
+
+def _docs_to_dicts(documents: list[RetrievedDocument]) -> list[dict]:
+    return [
+        {
+            "doc_id": doc.doc_id,
+            "title": doc.title,
+            "source_type": doc.source_type,
+            "content": doc.content,
+            "tags": doc.tags,
+            "risk_level": doc.risk_level,
+            "score": doc.score,
+        }
+        for doc in documents
+    ]
+
+
+def _evidence_summary(documents: list[RetrievedDocument]) -> list[dict]:
+    return [
+        {"doc_id": doc.doc_id, "title": doc.title, "risk_level": doc.risk_level}
+        for doc in documents
+    ]

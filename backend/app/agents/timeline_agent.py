@@ -1,8 +1,7 @@
 """MoveInTimelineAgent: build a move-in timeline and flag late shipping.
 
 Generates phased tasks anchored on today's date and the student's move-in date.
-Tasks adapt to transportation mode (e.g. flying favors compact shipping and
-buying bulky items after arrival).
+Retrieved logistics knowledge grounds timeline advice in curated evidence.
 """
 
 from __future__ import annotations
@@ -12,10 +11,14 @@ from datetime import date, timedelta
 from app.agents.base import BaseAgent
 from app.models.schemas import TimelineTask, TransportationMode
 from app.orchestrator.state import AgentState
+from app.rag.retriever import LocalKnowledgeRetriever, RetrievedDocument, get_retriever
 
 
 class MoveInTimelineAgent(BaseAgent):
     name = "MoveInTimelineAgent"
+
+    def __init__(self, retriever: LocalKnowledgeRetriever | None = None) -> None:
+        self._retriever = retriever or get_retriever()
 
     def run(self, state: AgentState) -> AgentState:
         profile = state.profile
@@ -42,7 +45,7 @@ class MoveInTimelineAgent(BaseAgent):
                 task_id="confirm-rules",
                 title="Confirm your dorm's official rules",
                 phase="preparation",
-                due_date=due(days_until),  # as soon as possible
+                due_date=due(days_until),
                 reason="Verify size/appliance limits before buying anything.",
             ),
             TimelineTask(
@@ -92,17 +95,51 @@ class MoveInTimelineAgent(BaseAgent):
                     reason="Flying limits luggage; prioritize small, light items.",
                 )
             )
-            tasks.append(
-                TimelineTask(
-                    task_id="buy-bulky-after-arrival",
-                    title="Buy bulky items after you arrive",
-                    phase="arrival",
-                    due_date=move_in,
-                    reason="Purchase fridge, rugs, and storage locally to avoid shipping.",
+            if not any(t.task_id == "buy-bulky-after-arrival" for t in tasks):
+                tasks.append(
+                    TimelineTask(
+                        task_id="buy-bulky-after-arrival",
+                        title="Buy bulky items after you arrive",
+                        phase="arrival",
+                        due_date=move_in,
+                        reason=(
+                            "Purchase fridge, rugs, and storage locally to avoid "
+                            "shipping."
+                        ),
+                    )
                 )
-            )
 
-        # Late-shipping risk: not enough lead time for shipped products.
+        retrieval_query = " ".join(
+            [
+                state.message,
+                profile.transportation_mode.value,
+                "move-in timeline logistics shipping documents",
+            ]
+        )
+        tags = ["logistics", "timeline", "move-in", "shipping"]
+        if flying:
+            tags.extend(["flight", "bulky", "compact"])
+        retrieved = self._retriever.retrieve(retrieval_query, top_k=5, tags=tags)
+        state.store_retrieved_context("timeline", _docs_to_dicts(retrieved))
+        if retrieved:
+            state.add_trace(
+                self.name,
+                "retrieved_timeline_context",
+                f"Retrieved {len(retrieved)} logistics document(s).",
+                evidence=_evidence_summary(retrieved),
+            )
+            doc_by_id = {doc.doc_id: doc for doc in retrieved}
+            if "logistics-documents" in doc_by_id:
+                doc = doc_by_id["logistics-documents"]
+                for task in tasks:
+                    if task.task_id == "pack-documents":
+                        task.reason += f" [{doc.doc_id}] {doc.title}."
+            if flying and "pack-buy-after-arrival" in doc_by_id:
+                doc = doc_by_id["pack-buy-after-arrival"]
+                for task in tasks:
+                    if task.task_id == "buy-bulky-after-arrival":
+                        task.reason += f" Evidence: [{doc.doc_id}] {doc.title}."
+
         flags: list[str] = []
         max_ship = max(
             (p.shipping_days for p in state.product_candidates), default=0
@@ -136,3 +173,25 @@ class MoveInTimelineAgent(BaseAgent):
             ),
         )
         return state
+
+
+def _docs_to_dicts(documents: list[RetrievedDocument]) -> list[dict]:
+    return [
+        {
+            "doc_id": doc.doc_id,
+            "title": doc.title,
+            "source_type": doc.source_type,
+            "content": doc.content,
+            "tags": doc.tags,
+            "risk_level": doc.risk_level,
+            "score": doc.score,
+        }
+        for doc in documents
+    ]
+
+
+def _evidence_summary(documents: list[RetrievedDocument]) -> list[dict]:
+    return [
+        {"doc_id": doc.doc_id, "title": doc.title, "risk_level": doc.risk_level}
+        for doc in documents
+    ]

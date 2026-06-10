@@ -29,6 +29,7 @@ from app.models.schemas import (
     TimelineSummary,
 )
 from app.orchestrator.graph import Orchestrator, orchestrator
+from app.rag import get_retriever
 
 router = APIRouter(prefix="/api/v1")
 
@@ -222,6 +223,29 @@ def get_runtime_metrics(
     service: SessionService = Depends(get_session_service),
 ) -> RuntimeMetricsResponse:
     return service.get_runtime_metrics()
+
+
+@router.get("/knowledge/search", tags=["knowledge"])
+def search_knowledge(
+    q: str,
+    top_k: int = 5,
+    tags: str | None = None,
+) -> list[dict]:
+    """Debug endpoint for local keyword retrieval over curated dorm knowledge."""
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else None
+    results = get_retriever().retrieve(q, top_k=top_k, tags=tag_list)
+    return [
+        {
+            "doc_id": doc.doc_id,
+            "title": doc.title,
+            "source_type": doc.source_type,
+            "content": doc.content,
+            "tags": doc.tags,
+            "risk_level": doc.risk_level,
+            "score": doc.score,
+        }
+        for doc in results
+    ]
 
 
 @router.post("/chat", response_model=ChatResponse, tags=["chat"])
